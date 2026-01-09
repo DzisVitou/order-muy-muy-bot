@@ -86,10 +86,33 @@ bot.onText(/\/admin/, (msg) => {
 // MAIN MESSAGE HANDLER
 // =====================
 bot.on("message", (msg) => {
+  // =====================
+// ADMIN DASHBOARD
+// =====================
+bot.onText(/\/admin/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (userId !== ADMIN_ID) {
+    bot.sendMessage(chatId, "⛔ Access denied.");
+    return;
+  }
+
+  bot.sendMessage(chatId, "🛠 Admin Dashboard", {
+    reply_markup: {
+      keyboard: [
+        ["📊 All Orders"],
+        ["👥 Users Count"],
+        ["⬅ Back"]
+      ],
+      resize_keyboard: true
+    }
+  });
+});
+
   const text = msg.text;
   const chatId = msg.chat.id;
   const userId = msg.from.id;
-  
 
   if (text === "/start") return;
 
