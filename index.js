@@ -40,10 +40,8 @@ function t(lang, en, kh) {
 // =====================
 // /START → LANGUAGE MENU
 // =====================
-
-bot.onText(/\/start/, (msg) => {
-  // =====================
-// ADMIN DASHBOARD
+// =====================
+// ADMIN DASHBOARD COMMAND
 // =====================
 bot.onText(/\/admin/, (msg) => {
   const chatId = msg.chat.id;
@@ -65,6 +63,11 @@ bot.onText(/\/admin/, (msg) => {
     }
   });
 });
+
+bot.onText(/\/start/, (msg) => {
+  // =====================
+// ADMIN DASHBOARD
+// =====================
 
   bot.sendMessage(
     msg.chat.id,
@@ -89,26 +92,66 @@ bot.on("message", (msg) => {
   // =====================
 // ADMIN DASHBOARD
 // =====================
-bot.onText(/\/admin/, (msg) => {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
+// =====================
+// ADMIN ACTIONS
+// =====================
+if (userId === ADMIN_ID) {
 
-  if (userId !== ADMIN_ID) {
-    bot.sendMessage(chatId, "⛔ Access denied.");
+  // 📊 All Orders
+  if (text === "📊 All Orders") {
+    db.all(`SELECT * FROM orders`, [], (err, rows) => {
+      if (!rows || rows.length === 0) {
+        bot.sendMessage(chatId, "No orders found.");
+      } else {
+        let reply = "📊 All Orders:\n";
+        rows.forEach(o => {
+          reply += `#${o.id} | ${o.customer} | ${o.item} | ${o.price} | ${o.status}\n`;
+        });
+        bot.sendMessage(chatId, reply);
+      }
+    });
     return;
   }
 
-  bot.sendMessage(chatId, "🛠 Admin Dashboard", {
-    reply_markup: {
-      keyboard: [
-        ["📊 All Orders"],
-        ["👥 Users Count"],
-        ["⬅ Back"]
-      ],
-      resize_keyboard: true
-    }
-  });
-});
+  // 👥 Users Count
+  if (text === "👥 Users Count") {
+    db.get(`SELECT COUNT(*) as count FROM users`, [], (err, row) => {
+      bot.sendMessage(chatId, `👥 Total users: ${row.count}`);
+    });
+    return;
+  }
+
+  // ⬅ Back
+  if (text === "⬅ Back") {
+    db.get(
+      `SELECT language FROM users WHERE user_id = ?`,
+      [userId],
+      (err, row) => {
+        const lang = row?.language || "en";
+
+        bot.sendMessage(
+          chatId,
+          t(lang, "Choose an option:", "ជ្រើសរើសមុខងារ៖"),
+          {
+            reply_markup: {
+              keyboard: [
+                [t(lang, "➕ New Order", "➕ កម្មង់ថ្មី")],
+                [t(lang, "📋 View Orders", "📋 មើលការកម្មង់")],
+                [
+                  t(lang, "✅ Mark Paid", "✅ បង់ប្រាក់រួច"),
+                  t(lang, "📦 Mark Delivered", "📦 បានដឹកជញ្ជូន")
+                ]
+              ],
+              resize_keyboard: true
+            }
+          }
+        );
+      }
+    );
+    return;
+  }
+}
+
 
   const text = msg.text;
   const chatId = msg.chat.id;
