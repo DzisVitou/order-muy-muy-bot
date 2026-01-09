@@ -1,0 +1,17 @@
+{
+  "name": "telegram-order-bot",
+  "version": "1.0.0",
+  "description": "Order Muy Muy Telegram Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.67.0",
+    "sqlite3": "^5.1.7"
+  }
+}
