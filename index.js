@@ -9,6 +9,8 @@ const bot = new TelegramBot(token, { polling: true });
 // DATABASE
 // =====================
 const db = new sqlite3.Database("./orders.db");
+const ADMIN_ID = 889980978; // 👈 replace with YOUR Telegram user ID
+
 
 db.run(`
   CREATE TABLE IF NOT EXISTS orders (
@@ -38,7 +40,32 @@ function t(lang, en, kh) {
 // =====================
 // /START → LANGUAGE MENU
 // =====================
+
 bot.onText(/\/start/, (msg) => {
+  // =====================
+// ADMIN DASHBOARD
+// =====================
+bot.onText(/\/admin/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (userId !== ADMIN_ID) {
+    bot.sendMessage(chatId, "⛔ Admin access only.");
+    return;
+  }
+
+  bot.sendMessage(chatId, "🛠 Admin Dashboard", {
+    reply_markup: {
+      keyboard: [
+        ["📊 All Orders"],
+        ["👥 Users Count"],
+        ["⬅ Back"]
+      ],
+      resize_keyboard: true
+    }
+  });
+});
+
   bot.sendMessage(
     msg.chat.id,
     "🌍 Choose language / ជ្រើសរើសភាសា",
@@ -62,6 +89,7 @@ bot.on("message", (msg) => {
   const text = msg.text;
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  
 
   if (text === "/start") return;
 
