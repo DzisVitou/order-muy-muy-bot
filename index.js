@@ -1,10 +1,19 @@
 const TelegramBot = require("node-telegram-bot-api");
 const sqlite3 = require("sqlite3").verbose();
 
-const token = process.env.BOT_TOKEN || "8451277814:AAHK1ocwQLw_gBsTqy3jVRuvc_uLWvIDRj8";
+// =====================
+// CONFIG
+// =====================
+const token = process.env.BOT_TOKEN; // MUST be set in Railway
 const ADMIN_ID = 889980978;
 
+if (!token) {
+  console.error("❌ BOT_TOKEN missing");
+  process.exit(1);
+}
+
 const bot = new TelegramBot(token, { polling: true });
+const orderFlow = {};
 
 // =====================
 // DATABASE
@@ -33,7 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
 const t = (lang, en, kh) => (lang === "kh" ? kh : en);
 
 // =====================
-// START
+// /START
 // =====================
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, "🌍 Choose language / ជ្រើសរើសភាសា", {
@@ -45,7 +54,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // =====================
-// ADMIN COMMAND
+// /ADMIN
 // =====================
 bot.onText(/\/admin/, (msg) => {
   if (msg.from.id !== ADMIN_ID) {
@@ -65,15 +74,16 @@ bot.onText(/\/admin/, (msg) => {
 });
 
 // =====================
-// MAIN HANDLER
+// MAIN MESSAGE HANDLER
 // =====================
 bot.on("message", (msg) => {
   const text = msg.text || "";
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
-  console.log("📩 MESSAGE:", text);
+  console.log("📩", userId, text);
 
+  // Ignore commands
   if (text.startsWith("/")) return;
 
   // =====================
@@ -82,7 +92,7 @@ bot.on("message", (msg) => {
   if (userId === ADMIN_ID) {
 
     if (text.includes("All Orders")) {
-      db.all(`SELECT * FROM orders`, [], (err, rows) => {
+      db.all(`SELECT * FROM orders`, [], (_, rows) => {
         if (!rows.length) {
           return bot.sendMessage(chatId, "📭 No orders found");
         }
@@ -105,14 +115,18 @@ bot.on("message", (msg) => {
     }
 
     if (text.includes("Back")) {
-      bot.sendMessage(chatId, "⬅ Back to menu", {
-        reply_markup: {
-          keyboard: [
-            ["➕ New Order"],
-            ["📋 View Orders"]
-          ],
-          resize_keyboard: true
-        }
+      db.get(`SELECT language FROM users WHERE user_id = ?`, [userId], (_, row) => {
+        const lang = row?.language || "en";
+
+        bot.sendMessage(chatId, t(lang, "Choose an option:", "ជ្រើសរើសមុខងារ៖"), {
+          reply_markup: {
+            keyboard: [
+              [t(lang, "➕ New Order", "➕ កម្មង់ថ្មី")],
+              [t(lang, "📋 View Orders", "📋 មើលការកម្មង់")]
+            ],
+            resize_keyboard: true
+          }
+        });
       });
       return;
     }
@@ -129,19 +143,75 @@ bot.on("message", (msg) => {
       [userId, lang]
     );
 
-    bot.sendMessage(
-      chatId,
-      t(lang, "✅ Language set!", "✅ បានកំណត់ភាសា"),
-      {
-        reply_markup: {
-          keyboard: [
-            [t(lang, "➕ New Order", "➕ កម្មង់ថ្មី")],
-            [t(lang, "📋 View Orders", "📋 មើលការកម្មង់")]
-          ],
-          resize_keyboard: true
-        }
+    bot.sendMessage(chatId, t(lang, "✅ Language set!", "✅ បានកំណត់ភាសា"), {
+      reply_markup: {
+        keyboard: [
+          [t(lang, "➕ New Order", "➕ កម្មង់ថ្មី")],
+          [t(lang, "📋 View Orders", "📋 មើលការកម្មង់")]
+        ],
+        resize_keyboard: true
       }
-    );
+    });
+    return;
+  }
+
+  // =====================
+  // START NEW ORDER
+  // =====================
+  if (text === "➕ New Order" || text === "➕ កម្មង់ថ្មី") {
+    orderFlow[userId] = { step: "customer" };
+    return bot.sendMessage(chatId, "👤 Customer name?");
+  }
+
+  // =====================
+  // ORDER FLOW STEPS
+  // =====================
+  if (orderFlow[userId]) {
+
+    if (orderFlow[userId].step === "customer") {
+      orderFlow[userId].customer = text;
+      orderFlow[userId].step = "item";
+      return bot.sendMessage(chatId, "📦 Item?");
+    }
+
+    if (orderFlow[userId].step === "item") {
+      orderFlow[userId].item = text;
+      orderFlow[userId].step = "price";
+      return bot.sendMessage(chatId, "💰 Price?");
+    }
+
+    if (orderFlow[userId].step === "price") {
+      const o = orderFlow[userId];
+      o.price = text;
+
+      db.run(
+        `INSERT INTO orders (user_id, customer, item, price, status)
+         VALUES (?, ?, ?, ?, ?)`,
+        [userId, o.customer, o.item, o.price, "Pending"]
+      );
+
+      delete orderFlow[userId];
+
+      return bot.sendMessage(chatId, "✅ Order saved!");
+    }
+  }
+
+  // =====================
+  // VIEW ORDERS (USER)
+  // =====================
+  if (text.includes("View Orders")) {
+    db.all(`SELECT * FROM orders WHERE user_id = ?`, [userId], (_, rows) => {
+      if (!rows.length) {
+        return bot.sendMessage(chatId, "📭 No orders yet");
+      }
+
+      let reply = "📋 Your Orders\n\n";
+      rows.forEach(o => {
+        reply += `#${o.id} | ${o.customer} | ${o.item} | ${o.price} | ${o.status}\n`;
+      });
+
+      bot.sendMessage(chatId, reply);
+    });
   }
 });
 
